@@ -1,0 +1,136 @@
+version: "3.9"
+services:
+  ### hadoop из предыдущей домашки
+  hadoop-namenode:
+    container_name: hadoop-namenode
+    restart: always
+    build: ./hadoop/namenode
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+      - "8020:8020"
+    volumes:
+      - hadoop_namenode:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=local_bigdata
+    env_file:
+      - ./hadoop/hadoop.env
+
+  hadoop-datanode1:
+    container_name: hadoop-datanode1
+    restart: always
+    build: ./hadoop/datanode
+    volumes:
+      - hadoop_datanode1:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "hadoop-namenode:9870"
+    env_file:
+      - ./hadoop/hadoop.env
+
+  hadoop-datanode2:
+    container_name: hadoop-datanode2
+    restart: always
+    build: ./hadoop/datanode
+    volumes:
+      - hadoop_datanode2:/hadoop/dfs/data
+    environment:
+      SERVICE_PRECONDITION: "hadoop-namenode:9870"
+    env_file:
+      - ./hadoop/hadoop.env
+
+  hadoop-resourcemanager:
+    container_name: hadoop-resourcemanager
+    restart: always
+    build: ./hadoop/resourcemanager
+    ports:
+      - "8088:8088"
+    environment:
+      SERVICE_PRECONDITION: "hadoop-namenode:9000 hadoop-namenode:9870 hadoop-datanode1:9864 hadoop-datanode2:9864"
+    env_file:
+      - ./hadoop/hadoop.env
+
+  hadoop-nodemanager1:
+    container_name: hadoop-nodemanager1
+    restart: always
+    build: ./hadoop/nodemanager
+    environment:
+      SERVICE_PRECONDITION: "hadoop-namenode:9000 hadoop-namenode:9870 hadoop-datanode1:9864 hadoop-resourcemanager:8088"
+    env_file:
+      - ./hadoop/hadoop.env
+
+  hadoop-nodemanager2:
+    container_name: hadoop-nodemanager2
+    restart: always
+    build: ./hadoop/nodemanager
+    environment:
+      SERVICE_PRECONDITION: "hadoop-namenode:9000 hadoop-namenode:9870 hadoop-datanode2:9864 hadoop-resourcemanager:8088"
+    env_file:
+      - ./hadoop/hadoop.env
+
+  hadoop-historyserver:
+    container_name: hadoop-historyserver
+    restart: always
+    build: ./hadoop/historyserver
+    ports:
+      - "8188:8188"
+    environment:
+      SERVICE_PRECONDITION: "hadoop-namenode:9000 hadoop-namenode:9870 hadoop-datanode1:9864 hadoop-datanode2:9864 hadoop-resourcemanager:8088"
+    volumes:
+      - hadoop_historyserver:/hadoop/yarn/timeline
+    env_file:
+      - ./hadoop/hadoop.env
+
+  ### spark из текущей домашки
+  spark-master:
+    build: ./spark/master
+    container_name: spark-master
+    ports:
+      - 8080:8080
+      - 7077:7077
+    volumes:
+      - shared-workspace:/opt/workspace
+
+  spark-worker1:
+    build: ./spark/worker
+    container_name: spark-worker1
+    environment:
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1g
+    ports:
+      - 8081:8081
+    volumes:
+      - shared-workspace:/opt/workspace
+    depends_on:
+      - spark-master
+
+  spark-worker2:
+    build: ./spark/worker
+    container_name: spark-worker2
+    environment:
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1g
+    ports:
+      - 8082:8081
+    volumes:
+      - shared-workspace:/opt/workspace
+    depends_on:
+      - spark-master
+
+  ### jupyter из текущей домашки
+  jupyter-lab:
+    build: ./jupyter/lab
+    container_name: jupyter-lab
+    ports:
+      - 8888:8888
+      - 4040:4040
+    volumes:
+      - shared-workspace:/opt/workspace
+
+volumes:
+  hadoop_namenode:
+  hadoop_datanode1:
+  hadoop_datanode2:
+  hadoop_historyserver:
+  shared-workspace:
+    name: "shared-workspace"
+    driver: local
